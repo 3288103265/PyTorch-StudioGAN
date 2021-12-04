@@ -584,12 +584,12 @@ class WORKER(object):
             # if ema is True: update parameters of the Gen_ema in adaptive way
             if self.MODEL.apply_g_ema:
                 self.ema.update(current_step)
-        return gen_acml_loss
+        return gen_acml_loss, fake_cond_loss
 
     # -----------------------------------------------------------------------------
     # log training statistics
     # -----------------------------------------------------------------------------
-    def log_train_statistics(self, current_step, real_cond_loss, gen_acml_loss, dis_acml_loss):
+    def log_train_statistics(self, current_step, real_cond_loss,fake_cond_loss, gen_acml_loss, dis_acml_loss):
         self.wandb_step = current_step + 1
         if self.MODEL.d_cond_mtd in self.MISC.classifier_based_GAN:
             cls_loss = real_cond_loss.item()
@@ -612,6 +612,8 @@ class WORKER(object):
         loss_dict = {
             "gen_loss": gen_acml_loss.item(),
             "dis_loss": dis_acml_loss.item(),
+            "real_cond_loss": real_cond_loss.item(),
+            "fake_cond_loss": fake_cond_loss.item(),
             "cls_loss": 0.0 if cls_loss == "N/A" else cls_loss,
         }
 
