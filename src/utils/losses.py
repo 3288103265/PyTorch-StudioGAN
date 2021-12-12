@@ -4,6 +4,7 @@
 
 # src/utils/loss.py
 
+from torch._C import device, dtype
 from torch.nn import DataParallel
 from torch import autograd
 import torch
@@ -75,14 +76,18 @@ class ConditionalContrastiveLoss(torch.nn.Module):
             label = torch.cat(misc.GatherLayer.apply(label), dim=0)
 
         sim_matrix = self.calculate_similarity_matrix(embed, embed)
-        sim_matrix = torch.exp(self._remove_diag(sim_matrix) / self.temperature)
-        neg_removal_mask = self._remove_diag(self._make_neg_removal_mask(label)[label])
+        sim_matrix = torch.exp(self._remove_diag(
+            sim_matrix) / self.temperature)
+        neg_removal_mask = self._remove_diag(
+            self._make_neg_removal_mask(label)[label])
         sim_pos_only = neg_removal_mask * sim_matrix
 
-        emb2proxy = torch.exp(self.cosine_similarity(embed, proxy) / self.temperature)
+        emb2proxy = torch.exp(self.cosine_similarity(
+            embed, proxy) / self.temperature)
 
         numerator = emb2proxy + sim_pos_only.sum(dim=1)
-        denomerator = torch.cat([torch.unsqueeze(emb2proxy, dim=1), sim_matrix], dim=1).sum(dim=1)
+        denomerator = torch.cat(
+            [torch.unsqueeze(emb2proxy, dim=1), sim_matrix], dim=1).sum(dim=1)
         return -torch.log(numerator / denomerator).mean()
 
 
@@ -127,14 +132,18 @@ class MiConditionalContrastiveLoss(torch.nn.Module):
             label = torch.cat(misc.GatherLayer.apply(label), dim=0)
 
         sim_matrix = self.calculate_similarity_matrix(mi_embed, mi_embed)
-        sim_matrix = torch.exp(self._remove_diag(sim_matrix) / self.temperature)
-        neg_removal_mask = self._remove_diag(self._make_neg_removal_mask(label)[label])
+        sim_matrix = torch.exp(self._remove_diag(
+            sim_matrix) / self.temperature)
+        neg_removal_mask = self._remove_diag(
+            self._make_neg_removal_mask(label)[label])
         sim_pos_only = neg_removal_mask * sim_matrix
 
-        emb2proxy = torch.exp(self.cosine_similarity(mi_embed, mi_proxy) / self.temperature)
+        emb2proxy = torch.exp(self.cosine_similarity(
+            mi_embed, mi_proxy) / self.temperature)
 
         numerator = emb2proxy + sim_pos_only.sum(dim=1)
-        denomerator = torch.cat([torch.unsqueeze(emb2proxy, dim=1), sim_matrix], dim=1).sum(dim=1)
+        denomerator = torch.cat(
+            [torch.unsqueeze(emb2proxy, dim=1), sim_matrix], dim=1).sum(dim=1)
         return -torch.log(numerator / denomerator).mean()
 
 
@@ -162,13 +171,13 @@ class Data2DataCrossEntropyLoss(torch.nn.Module):
         mask_multi, target = np.ones([self.num_classes, num_samples]), 0.0
 
         for c in range(self.num_classes):
-            c_indices = np.where(labels==c)
+            c_indices = np.where(labels == c)
             mask_multi[c, c_indices] = target
         return torch.tensor(mask_multi).type(torch.long).to(self.master_rank)
 
     def remove_diag(self, M):
         h, w = M.shape
-        assert h==w, "h and w should be same"
+        assert h == w, "h and w should be same"
         mask = np.ones((h, w)) - np.eye(h)
         mask = torch.from_numpy(mask)
         mask = (mask).type(torch.bool).to(self.master_rank)
@@ -182,7 +191,8 @@ class Data2DataCrossEntropyLoss(torch.nn.Module):
             label = torch.cat(misc.GatherLayer.apply(label), dim=0)
 
         # calculate similarities between sample embeddings
-        sim_matrix = self.calculate_similarity_matrix(embed, embed) + self.m_p - 1
+        sim_matrix = self.calculate_similarity_matrix(
+            embed, embed) + self.m_p - 1
         # remove diagonal terms
         sim_matrix = self.remove_diag(sim_matrix/self.temperature)
         # for numerical stability
@@ -199,7 +209,8 @@ class Data2DataCrossEntropyLoss(torch.nn.Module):
         # compute positive attraction term
         pos_attr = F.relu((self.m_p - smp2proxy)/self.temperature)
         # compute negative repulsion term
-        neg_repul = torch.log(torch.exp(-pos_attr) + improved_sim_matrix.sum(dim=1))
+        neg_repul = torch.log(torch.exp(-pos_attr) +
+                              improved_sim_matrix.sum(dim=1))
         # compute data to data cross-entropy criterion
         criterion = pos_attr + neg_repul
         return criterion.mean()
@@ -229,13 +240,13 @@ class MiData2DataCrossEntropyLoss(torch.nn.Module):
         mask_multi, target = np.ones([self.num_classes, num_samples]), 0.0
 
         for c in range(self.num_classes):
-            c_indices = np.where(labels==c)
+            c_indices = np.where(labels == c)
             mask_multi[c, c_indices] = target
         return torch.tensor(mask_multi).type(torch.long).to(self.master_rank)
 
     def remove_diag(self, M):
         h, w = M.shape
-        assert h==w, "h and w should be same"
+        assert h == w, "h and w should be same"
         mask = np.ones((h, w)) - np.eye(h)
         mask = torch.from_numpy(mask)
         mask = (mask).type(torch.bool).to(self.master_rank)
@@ -249,7 +260,8 @@ class MiData2DataCrossEntropyLoss(torch.nn.Module):
             label = torch.cat(misc.GatherLayer.apply(label), dim=0)
 
         # calculate similarities between sample embeddings
-        sim_matrix = self.calculate_similarity_matrix(mi_embed, mi_embed) + self.m_p - 1
+        sim_matrix = self.calculate_similarity_matrix(
+            mi_embed, mi_embed) + self.m_p - 1
         # remove diagonal terms
         sim_matrix = self.remove_diag(sim_matrix/self.temperature)
         # for numerical stability
@@ -266,10 +278,53 @@ class MiData2DataCrossEntropyLoss(torch.nn.Module):
         # compute positive attraction term
         pos_attr = F.relu((self.m_p - smp2proxy)/self.temperature)
         # compute negative repulsion term
-        neg_repul = torch.log(torch.exp(-pos_attr) + improved_sim_matrix.sum(dim=1))
+        neg_repul = torch.log(torch.exp(-pos_attr) +
+                              improved_sim_matrix.sum(dim=1))
         # compute data to data cross-entropy criterion
         criterion = pos_attr + neg_repul
         return criterion.mean()
+
+
+class NT_Xent_loss(torch.nn.Module):
+    def __init__(self, num_classes, temperature, master_rank, DDP):
+        super(NT_Xent_loss, self).__init__()
+        self.num_classes = num_classes
+        self.temperature = temperature
+        self.master_rank = master_rank
+        self.DDP = DDP
+        self.cosine_similarity = torch.nn.CosineSimilarity(dim=-1)
+
+        self.similarity_function = self._get_similarity_function()
+        self.criterion = torch.nn.CrossEntropyLoss(reduction="sum")
+
+    def _get_similarity_function(self, use_cosine_similarity=True):
+        if use_cosine_similarity:
+            return self._cosine_simililarity
+        else:
+            return self._dot_simililarity
+
+    @staticmethod
+    def _dot_simililarity(x, y):
+        v = torch.tensordot(x.unsqueeze(1), y.T.unsqueeze(0), dims=2)
+        return v
+
+    @staticmethod
+    def _cosine_simililarity(x, y):
+        x = F.normalize(x, dim=1)
+        y = F.normalize(y, dim=1)
+        v = torch.mm(x, y.T)
+        return v
+
+    def forward(self, embed, proxy, **_):
+        if self.DDP:
+            embed = torch.cat(misc.GatherLayer.apply(embed), dim=0)
+            proxy = torch.cat(misc.GatherLayer.apply(proxy), dim=0)
+
+        similarity_matrix = self.similarity_function(embed, proxy)
+        logits = similarity_matrix / self.temperature
+        labels = torch.arange(embed.shape[0],dtype=torch.long).to(self.master_rank)
+        loss = self.criterion(logits, labels)
+        return loss / embed.shape[0]
 
 
 class PathLengthRegularizer:
@@ -279,11 +334,13 @@ class PathLengthRegularizer:
         self.pl_mean = torch.zeros([], device=device)
 
     def cal_pl_reg(self, fake_images, ws):
-        #ws refers to weight style
-        #receives new fake_images of original batch (in original implementation, fakes_images used for calculating g_loss and pl_loss is generated independently)
-        pl_noise = torch.randn_like(fake_images) / np.sqrt(fake_images.shape[2] * fake_images.shape[3])
+        # ws refers to weight style
+        # receives new fake_images of original batch (in original implementation, fakes_images used for calculating g_loss and pl_loss is generated independently)
+        pl_noise = torch.randn_like(
+            fake_images) / np.sqrt(fake_images.shape[2] * fake_images.shape[3])
         with conv2d_gradfix.no_weight_gradients():
-            pl_grads = torch.autograd.grad(outputs=[(fake_images * pl_noise).sum()], inputs=[ws], create_graph=True, only_inputs=True)[0]
+            pl_grads = torch.autograd.grad(outputs=[(
+                fake_images * pl_noise).sum()], inputs=[ws], create_graph=True, only_inputs=True)[0]
         pl_lengths = pl_grads.square().sum(2).mean(1).sqrt()
         pl_mean = self.pl_mean.lerp(pl_lengths.mean(), self.pl_decay)
         self.pl_mean.copy_(pl_mean.detach())
@@ -295,22 +352,28 @@ class PathLengthRegularizer:
 def d_vanilla(d_logit_real, d_logit_fake, DDP):
     device = d_logit_real.get_device()
     ones = torch.ones_like(d_logit_real, device=device, requires_grad=False)
-    d_loss = -torch.mean(nn.LogSigmoid()(d_logit_real) + nn.LogSigmoid()(ones - d_logit_fake))
+    d_loss = -torch.mean(nn.LogSigmoid()(d_logit_real) +
+                         nn.LogSigmoid()(ones - d_logit_fake))
     return d_loss
+
 
 def g_vanilla(d_logit_fake, DDP):
     return -torch.mean(nn.LogSigmoid()(d_logit_fake))
+
 
 def d_logistic(d_logit_real, d_logit_fake, DDP):
     d_loss = F.softplus(-d_logit_real) + F.softplus(d_logit_fake)
     return d_loss.mean()
 
+
 def g_logistic(d_logit_fake, DDP):
     # basically same as g_vanilla.
     return F.softplus(-d_logit_fake).mean()
 
+
 def d_ls(d_logit_real, d_logit_fake, DDP):
-    d_loss = 0.5 * (d_logit_real - torch.ones_like(d_logit_real))**2 + 0.5 * (d_logit_fake)**2
+    d_loss = 0.5 * (d_logit_real - torch.ones_like(d_logit_real)
+                    )**2 + 0.5 * (d_logit_fake)**2
     return d_loss.mean()
 
 
@@ -341,7 +404,8 @@ def crammer_singer_loss(adv_output, label, DDP, **_):
     num_real_classes = adv_output.shape[1] - 1
     mask = torch.ones_like(adv_output).to(adv_output.device)
     mask.scatter_(1, label.unsqueeze(-1), 0)
-    wrongs = torch.masked_select(adv_output, mask.bool()).reshape(adv_output.shape[0], num_real_classes)
+    wrongs = torch.masked_select(adv_output, mask.bool()).reshape(
+        adv_output.shape[0], num_real_classes)
     max_wrong, _ = wrongs.max(1)
     max_wrong = max_wrong.unsqueeze(-1)
     target = adv_output.gather(1, label.unsqueeze(-1))
@@ -351,7 +415,8 @@ def crammer_singer_loss(adv_output, label, DDP, **_):
 def feature_matching_loss(real_embed, fake_embed):
     # https://github.com/ilyakava/BigGAN-PyTorch/blob/master/train_fns.py
     # feature matching criterion
-    fm_loss = torch.mean(torch.abs(torch.mean(fake_embed, 0) - torch.mean(real_embed, 0)))
+    fm_loss = torch.mean(torch.abs(torch.mean(
+        fake_embed, 0) - torch.mean(real_embed, 0)))
     return fm_loss
 
 
@@ -368,12 +433,14 @@ def cal_deriv(inputs, outputs, device):
 def latent_optimise(zs, fake_labels, generator, discriminator, batch_size, lo_rate, lo_steps, lo_alpha, lo_beta, eval,
                     cal_trsp_cost, device):
     for step in range(lo_steps - 1):
-        drop_mask = (torch.FloatTensor(batch_size, 1).uniform_() > 1 - lo_rate).to(device)
+        drop_mask = (torch.FloatTensor(batch_size, 1).uniform_()
+                     > 1 - lo_rate).to(device)
 
         zs = autograd.Variable(zs, requires_grad=True)
         fake_images = generator(zs, fake_labels, eval=eval)
         fake_dict = discriminator(fake_images, fake_labels, eval=eval)
-        z_grads = cal_deriv(inputs=zs, outputs=fake_dict["adv_output"], device=device)
+        z_grads = cal_deriv(
+            inputs=zs, outputs=fake_dict["adv_output"], device=device)
         z_grads_norm = torch.unsqueeze((z_grads.norm(2, dim=1)**2), dim=1)
         delta_z = lo_alpha * z_grads / (lo_beta + z_grads_norm)
         zs = torch.clamp(zs + drop_mask * delta_z, -1.0, 1.0)
@@ -391,7 +458,8 @@ def latent_optimise(zs, fake_labels, generator, discriminator, batch_size, lo_ra
 def cal_grad_penalty(real_images, real_labels, fake_images, discriminator, device):
     batch_size, c, h, w = real_images.shape
     alpha = torch.rand(batch_size, 1)
-    alpha = alpha.expand(batch_size, real_images.nelement() // batch_size).contiguous().view(batch_size, c, h, w)
+    alpha = alpha.expand(batch_size, real_images.nelement(
+    ) // batch_size).contiguous().view(batch_size, c, h, w)
     alpha = alpha.to(device)
 
     real_images = real_images.to(device)
@@ -399,7 +467,8 @@ def cal_grad_penalty(real_images, real_labels, fake_images, discriminator, devic
     interpolates = interpolates.to(device)
     interpolates = autograd.Variable(interpolates, requires_grad=True)
     fake_dict = discriminator(interpolates, real_labels, eval=False)
-    grads = cal_deriv(inputs=interpolates, outputs=fake_dict["adv_output"], device=device)
+    grads = cal_deriv(inputs=interpolates,
+                      outputs=fake_dict["adv_output"], device=device)
     grads = grads.view(grads.size(0), -1)
 
     grad_penalty = ((grads.norm(2, dim=1) - 1)**2).mean()
@@ -417,7 +486,8 @@ def cal_dra_penalty(real_images, real_labels, discriminator, device):
     interpolates = interpolates.to(device)
     interpolates = autograd.Variable(interpolates, requires_grad=True)
     fake_dict = discriminator(interpolates, real_labels, eval=False)
-    grads = cal_deriv(inputs=interpolates, outputs=fake_dict["adv_output"], device=device)
+    grads = cal_deriv(inputs=interpolates,
+                      outputs=fake_dict["adv_output"], device=device)
     grads = grads.view(grads.size(0), -1)
 
     grad_penalty = ((grads.norm(2, dim=1) - 1)**2).mean()
@@ -427,7 +497,8 @@ def cal_dra_penalty(real_images, real_labels, discriminator, device):
 def cal_maxgrad_penalty(real_images, real_labels, fake_images, discriminator, device):
     batch_size, c, h, w = real_images.shape
     alpha = torch.rand(batch_size, 1)
-    alpha = alpha.expand(batch_size, real_images.nelement() // batch_size).contiguous().view(batch_size, c, h, w)
+    alpha = alpha.expand(batch_size, real_images.nelement(
+    ) // batch_size).contiguous().view(batch_size, c, h, w)
     alpha = alpha.to(device)
 
     real_images = real_images.to(device)
@@ -435,7 +506,8 @@ def cal_maxgrad_penalty(real_images, real_labels, fake_images, discriminator, de
     interpolates = interpolates.to(device)
     interpolates = autograd.Variable(interpolates, requires_grad=True)
     fake_dict = discriminator(interpolates, real_labels, eval=False)
-    grads = cal_deriv(inputs=interpolates, outputs=fake_dict["adv_output"], device=device)
+    grads = cal_deriv(inputs=interpolates,
+                      outputs=fake_dict["adv_output"], device=device)
     grads = grads.view(grads.size(0), -1)
 
     maxgrad_penalty = torch.max(grads.norm(2, dim=1)**2)
@@ -444,17 +516,21 @@ def cal_maxgrad_penalty(real_images, real_labels, fake_images, discriminator, de
 
 def cal_r1_reg(adv_output, images, device):
     batch_size = images.size(0)
-    grad_dout = cal_deriv(inputs=images, outputs=adv_output.sum(), device=device)
+    grad_dout = cal_deriv(
+        inputs=images, outputs=adv_output.sum(), device=device)
     grad_dout2 = grad_dout.pow(2)
     assert (grad_dout2.size() == images.size())
     r1_reg = 0.5 * grad_dout2.contiguous().view(batch_size, -1).sum(1).mean(0)
     return r1_reg
 
+
 def stylegan_cal_r1_reg(adv_output, images):
     with conv2d_gradfix.no_weight_gradients():
-        r1_grads = torch.autograd.grad(outputs=[adv_output.sum()], inputs=[images], create_graph=True, only_inputs=True)[0]
-    r1_penalty = r1_grads.square().sum([1,2,3])/2
+        r1_grads = torch.autograd.grad(outputs=[adv_output.sum()], inputs=[
+                                       images], create_graph=True, only_inputs=True)[0]
+    r1_penalty = r1_grads.square().sum([1, 2, 3])/2
     return r1_penalty.mean()
+
 
 def adjust_k(current_k, topk_gamma, sup_k):
     current_k = max(current_k * topk_gamma, sup_k)

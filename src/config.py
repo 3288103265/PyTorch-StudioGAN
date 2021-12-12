@@ -311,7 +311,7 @@ class Configurations(object):
 
         self.MISC.no_proc_data = ["CIFAR10", "CIFAR100", "Tiny_ImageNet"]
         self.MISC.base_folders = ["checkpoints", "figures", "logs", "moments", "samples", "values"]
-        self.MISC.classifier_based_GAN = ["AC", "2C", "D2DCE"]
+        self.MISC.classifier_based_GAN = ["AC", "2C", "D2DCE", "NT-Xent"]
         self.MISC.cas_setting = {
             "CIFAR10": {
                 "batch_size": 128,

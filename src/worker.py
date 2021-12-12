@@ -124,6 +124,17 @@ class WORKER(object):
             self.cond_loss = losses.CrossEntropyLoss()
             if self.MODEL.aux_cls_type == "TAC":
                 self.cond_loss_mi = losses.MiCrossEntropyLoss()
+                
+        elif self.MODEL.d_cond_mtd == "NT-Xent":
+            self.cond_loss = losses.NT_Xent_loss(num_classes=num_classes,
+                                                               temperature=self.LOSS.temperature,
+                                                               master_rank="cuda",
+                                                               DDP=self.DDP)
+            if self.MODEL.aux_cls_type == "TAC":
+                self.cond_loss_mi = losses.MiConditionalContrastiveLoss(num_classes=self.DATA.num_classes,
+                                                                        temperature=self.LOSS.temperature,
+                                                                        master_rank="cuda",
+                                                                        DDP=self.DDP)
         elif self.MODEL.d_cond_mtd == "2C":
             self.cond_loss = losses.ConditionalContrastiveLoss(num_classes=num_classes,
                                                                temperature=self.LOSS.temperature,
