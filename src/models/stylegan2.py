@@ -799,7 +799,7 @@ class Discriminator(torch.nn.Module):
             self.linear2 = FullyConnectedLayer(channels_dict[4], self.cmap_dim, bias=True)
         elif self.d_cond_mtd == "SPD":
             self.mapping = MappingNetwork(z_dim=0, c_dim=c_dim, w_dim=self.cmap_dim, num_ws=None, w_avg_beta=None, **mapping_kwargs)
-        elif self.d_cond_mtd in ["2C", "D2DCE"]:
+        elif self.d_cond_mtd in ["2C", "NT-Xent","D2DCE"]:
             self.linear2 = FullyConnectedLayer(channels_dict[4], d_embed_dim, bias=True)
             self.embedding = MappingNetwork(z_dim=0, c_dim=c_dim, w_dim=d_embed_dim, num_ws=None, w_avg_beta=None, num_layers=1, **mapping_kwargs)
         else:
@@ -809,7 +809,7 @@ class Discriminator(torch.nn.Module):
         if self.aux_cls_type == "TAC":
             if self.d_cond_mtd == "AC":
                 self.linear_mi = FullyConnectedLayer(channels_dict[4], num_classes, bias=False)
-            elif self.d_cond_mtd in ["2C", "D2DCE"]:
+            elif self.d_cond_mtd in ["2C","NT-Xent", "D2DCE"]:
                 self.linear_mi = FullyConnectedLayer(channels_dict[4], d_embed_dim, bias=True)
                 self.embedding_mi = MappingNetwork(z_dim=0, c_dim=c_dim, w_dim=d_embed_dim, num_ws=None, w_avg_beta=None, num_layers=1, **mapping_kwargs)
             else:
@@ -848,7 +848,7 @@ class Discriminator(torch.nn.Module):
             embed = self.linear1(h)
             cmap = self.mapping(None, oh_label)
             adv_output = (embed * cmap).sum(dim=1, keepdim=True) * (1 / np.sqrt(self.cmap_dim))
-        elif self.d_cond_mtd in ["2C", "D2DCE"]:
+        elif self.d_cond_mtd in ["2C", "NT-Xent", "D2DCE"]:
             embed = self.linear2(h)
             proxy = self.embedding(None, oh_label)
             if self.normalize_d_embed:
@@ -869,7 +869,7 @@ class Discriminator(torch.nn.Module):
                     for W in self.linear_mi.parameters():
                         W = F.normalize(W, dim=1)
                 mi_cls_output = self.linear_mi(h)
-            elif self.d_cond_mtd in ["2C", "D2DCE"]:
+            elif self.d_cond_mtd in ["2C","NT-Xent", "D2DCE"]:
                 mi_embed = self.linear_mi(h)
                 mi_proxy = self.embedding_mi(None, oh_label)
                 if self.normalize_d_embed:
